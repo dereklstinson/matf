@@ -30,9 +30,7 @@ type Matf struct {
 }
 
 // Dim contains the dimensions of a MatMatrix
-type Dim struct {
-	X, Y, Z int
-}
+type Dim []int
 
 // NumPrt contains the numeric part of a matrix
 type NumPrt struct {
@@ -97,24 +95,16 @@ func readHeader(mat *Matf, file *os.File) error {
 	return nil
 }
 
-func readDimensions(data interface{}) (Dim, error) {
-	var dim Dim
-	t := reflect.ValueOf(data)
+func readDimensions(data interface{}) (d Dim, err error) {
 
+	t := reflect.ValueOf(data)
+	d = make(Dim, t.Len())
 	for i := 0; i < t.Len(); i++ {
-		value := reflect.ValueOf(t.Index(i).Interface()).Int()
-		switch i {
-		case 0:
-			dim.X = int(value)
-		case 1:
-			dim.Y = int(value)
-		case 2:
-			dim.Z = int(value)
-		default:
-			return Dim{}, fmt.Errorf("More dimensions than exptected")
-		}
+
+		d[i] = (int)(reflect.ValueOf(t.Index(i).Interface()).Int())
+
 	}
-	return dim, nil
+	return d, nil
 }
 
 func alignIndex(r io.Reader, order binary.ByteOrder, index int) int {
@@ -133,7 +123,7 @@ func extractClass(mat *MatMatrix, r io.Reader, order binary.ByteOrder) (int, err
 	switch int(mat.Class) {
 	case MxCellClass:
 		var content CellPrt
-		var maxElements = mat.Dim.Y
+		var maxElements = mat.Dim[1]
 		var noElements int
 		for {
 			if noElements >= maxElements {
@@ -169,7 +159,7 @@ func extractClass(mat *MatMatrix, r io.Reader, order binary.ByteOrder) (int, err
 		content.FieldNames = fieldNames
 		index = alignIndex(r, order, index+(int(numberOfFields)*int(fieldNameLength)))
 		// Field Values
-		toExtract := (mat.Dim.Y * int(numberOfFields))
+		toExtract := (mat.Dim[1] * int(numberOfFields))
 		var i int
 		for ; toExtract > 0; toExtract-- {
 			var element interface{}
@@ -186,7 +176,7 @@ func extractClass(mat *MatMatrix, r io.Reader, order binary.ByteOrder) (int, err
 		mat.Content = content
 	case MxCharClass:
 		var content CharPrt
-		var maxElements = mat.Dim.X
+		var maxElements = mat.Dim[0]
 
 		element, numberOfBytes, err := extractArrayName(r, order)
 		if err != nil {
@@ -393,8 +383,10 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (MatMatrix, error) {
 }
 
 // Dimensions returns the dimensions of a matrix
-func (m MatMatrix) Dimensions() (int, int, int, error) {
-	return m.Dim.X, m.Dim.Y, m.Dim.Z, nil
+func (m MatMatrix) Dimensions() (dims []int, err error) {
+	dims = make([]int, len(m.Dim))
+	copy(dims, m.Dim)
+	return dims, nil
 }
 
 // Open a MAT-file and extracts the header information into the Header struct.
